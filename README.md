@@ -1,6 +1,6 @@
-# Network Security Labs: Palo Alto · Fortinet · Juniper SRX
+# Firewall Configuration Examples: Palo Alto · Fortinet · Juniper SRX
 
-Hands-on next-generation firewall labs, based on the work I do on production firewalls. Each lab has a goal, the configuration, and the commands I use to verify it.
+Reference configurations for the techniques I use in production firewall projects. The real projects are in [network-security-projects](https://github.com/mihirchandra10/network-security-projects). Each lab has a goal, the configuration, and the commands I use to verify it.
 
 > All addresses are lab/documentation values. Keys and passwords are `<PLACEHOLDERS>`.
 > The labs for each vendor build on each other: objects such as profile groups and address entries are defined in an earlier lab and reused later. Exact syntax and category IDs vary between OS versions (PAN-OS 10/11, FortiOS 7.x, Junos 21+), so check against your release.
