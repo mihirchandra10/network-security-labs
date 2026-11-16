@@ -1,0 +1,35 @@
+# Lab PA-02: Threat prevention profiles
+# Goal: build a strict security profile group (AV, anti-spyware with DNS sinkhole,
+#       vulnerability protection, WildFire, file blocking) and attach it to allow rules.
+# Test: download the EICAR test file over HTTP; resolve a test sinkhole domain;
+#       run a harmless vulnerability scan from the untrust side.
+# Verify: Monitor > Threat ; show log threat direction equal backward
+
+# Antivirus: reset both sides on detection for the common decoders
+set profiles virus AV-STRICT decoder http action reset-both
+set profiles virus AV-STRICT decoder smtp action reset-both
+set profiles virus AV-STRICT decoder ftp action reset-both
+set profiles virus AV-STRICT decoder smb action reset-both
+
+# Anti-spyware with DNS sinkhole
+set profiles spyware AS-STRICT rules BLOCK-CRIT-HIGH severity [ critical high medium ] action reset-both threat-name any category any
+set profiles spyware AS-STRICT botnet-domains lists default-paloalto-dns action sinkhole
+set profiles spyware AS-STRICT botnet-domains sinkhole ipv4-address 198.51.100.254
+
+# Vulnerability protection
+set profiles vulnerability VP-STRICT rules BLOCK-CRIT-HIGH severity [ critical high medium ] action reset-both vendor-id any cve any threat-name any host any category any
+set profiles vulnerability VP-STRICT rules ALERT-LOW severity [ low informational ] action alert vendor-id any cve any threat-name any host any category any
+
+# WildFire: send all unknown files for analysis
+set profiles wildfire-analysis WF-ALL rules ALL application any file-type any direction both analysis public-cloud
+
+# File blocking: block risky file types, alert on the rest
+set profiles file-blocking FB-STRICT rules BLOCK-EXEC application any file-type [ bat exe msi hta ps1 ] direction both action block
+set profiles file-blocking FB-STRICT rules ALERT-ALL application any file-type any direction both action alert
+
+# Group them for easy reuse
+set profile-group STRICT virus AV-STRICT spyware AS-STRICT vulnerability VP-STRICT wildfire-analysis WF-ALL file-blocking FB-STRICT
+
+# Sinkhole visibility: block traffic to the sinkhole IP so infected hosts show up in the traffic log
+set address SINKHOLE ip-netmask 198.51.100.254
+set rulebase security rules SINKHOLE-BLOCK from trust to any source any destination SINKHOLE application any service any action deny log-end yes

@@ -1,0 +1,32 @@
+# Lab PA-05: GlobalProtect remote-access VPN
+# Goal: remote users connect with GlobalProtect, authenticate against AD (LDAP) and get
+#       group-based access to internal resources through a dedicated "vpn" zone.
+# Verify: show global-protect-gateway current-user ; Monitor > GlobalProtect
+
+# Tunnel interface and zone
+set network interface tunnel units tunnel.10 ip 10.250.0.1/24
+set zone vpn network layer3 tunnel.10
+set network virtual-router default interface tunnel.10
+
+# Authentication profile (LDAP against AD)
+set authentication-profile AUTH-AD method ldap server-profile LDAP-AD login-attribute sAMAccountName
+set authentication-profile AUTH-AD allow-list all
+
+# Portal
+set global-protect global-protect-portal GP-PORTAL portal-config local-address interface ethernet1/1
+set global-protect global-protect-portal GP-PORTAL portal-config ssl-tls-service-profile SSL-GP
+set global-protect global-protect-portal GP-PORTAL portal-config client-auth AUTH authentication-profile AUTH-AD
+set global-protect global-protect-portal GP-PORTAL client-config configs DEFAULT gateways external list GW-1 fqdn vpn.example.com
+
+# Gateway
+set global-protect global-protect-gateway GP-GW local-address interface ethernet1/1
+set global-protect global-protect-gateway GP-GW ssl-tls-service-profile SSL-GP
+set global-protect global-protect-gateway GP-GW client-auth AUTH authentication-profile AUTH-AD
+set global-protect global-protect-gateway GP-GW tunnel-mode yes tunnel-interface tunnel.10
+set global-protect global-protect-gateway GP-GW remote-user-tunnel-configs DEFAULT ip-pool 10.250.0.0/24
+set global-protect global-protect-gateway GP-GW remote-user-tunnel-configs DEFAULT split-tunneling access-route [ 10.10.0.0/16 172.16.10.0/24 ]
+
+# Policy: VPN users reach internal apps only, with threat inspection
+set rulebase security rules GP-USERS-TO-INTERNAL from vpn to [ trust dmz ] source any destination any source-user any
+set rulebase security rules GP-USERS-TO-INTERNAL application APP-BUSINESS service application-default action allow
+set rulebase security rules GP-USERS-TO-INTERNAL profile-setting group STRICT log-end yes

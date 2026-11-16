@@ -1,0 +1,30 @@
+# Lab PA-01: App-ID and User-ID least-privilege policy
+# Goal: allow only the business applications each AD group needs, and block the rest with logging.
+# Verify: Monitor > Traffic (filter by app / user)
+#         CLI: show user ip-user-mapping all
+#              test security-policy-match from trust to untrust source 10.10.0.50 destination 8.8.8.8 protocol 6 destination-port 443 application ssl
+
+# User-ID: map users from AD security logs via the User-ID agent
+set user-id-collector setting enable-mapping-timeout yes ip-user-mapping-timeout 60
+set zone trust enable-user-identification yes
+set group-mapping AD-GROUPS server-profile LDAP-AD group-include-list [ "cn=it-admins,ou=groups,dc=lab,dc=local" "cn=finance,ou=groups,dc=lab,dc=local" "cn=staff,ou=groups,dc=lab,dc=local" ]
+
+# Application groups
+set application-group APP-BUSINESS members [ ms-office365 ms-teams zoom ssl web-browsing ]
+set application-group APP-ADMIN members [ ssh ms-rdp snmp ]
+
+# Rule 1: IT admins may manage servers in the DMZ
+set rulebase security rules IT-ADMIN-MGMT from trust to dmz source-user "cn=it-admins,ou=groups,dc=lab,dc=local" source any destination any
+set rulebase security rules IT-ADMIN-MGMT application APP-ADMIN service application-default action allow log-end yes
+
+# Rule 2: staff and finance get business apps only
+set rulebase security rules STAFF-BUSINESS-APPS from trust to untrust source-user [ "cn=staff,ou=groups,dc=lab,dc=local" "cn=finance,ou=groups,dc=lab,dc=local" ] source any destination any
+set rulebase security rules STAFF-BUSINESS-APPS application APP-BUSINESS service application-default action allow
+set rulebase security rules STAFF-BUSINESS-APPS profile-setting group STRICT log-end yes
+
+# Rule 3: block risky applications explicitly (logged for reporting)
+set rulebase security rules BLOCK-RISKY from trust to untrust source any destination any
+set rulebase security rules BLOCK-RISKY application [ bittorrent tor ultrasurf psiphon ] service any action deny log-end yes
+
+# Rule 4: default deny with logging
+set rulebase security rules DENY-ALL from any to any source any destination any application any service any action deny log-end yes

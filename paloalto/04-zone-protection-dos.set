@@ -1,0 +1,29 @@
+# Lab PA-04: Zone protection and DoS protection
+# Goal: protect the untrust zone from floods, reconnaissance and malformed packets,
+#       and protect the DMZ web server with a classified DoS policy.
+# Test: hping3 SYN flood and nmap scan from the attacker VM.
+# Verify: Monitor > Threat (type: flood / scan) ; show zone-protection zone untrust
+
+# Zone protection profile
+set network profiles zone-protection-profile ZP-UNTRUST flood tcp-syn enable yes
+set network profiles zone-protection-profile ZP-UNTRUST flood tcp-syn syn-cookies alarm-rate 10000 activate-rate 10000 maximal-rate 40000
+set network profiles zone-protection-profile ZP-UNTRUST flood udp enable yes
+set network profiles zone-protection-profile ZP-UNTRUST flood udp red alarm-rate 10000 activate-rate 10000 maximal-rate 40000
+set network profiles zone-protection-profile ZP-UNTRUST flood icmp enable yes
+set network profiles zone-protection-profile ZP-UNTRUST scan 8001 action block-ip block-ip track-by source duration 300
+set network profiles zone-protection-profile ZP-UNTRUST scan 8001 interval 2 threshold 100
+set network profiles zone-protection-profile ZP-UNTRUST scan 8003 action block-ip block-ip track-by source duration 300
+set network profiles zone-protection-profile ZP-UNTRUST discard-ip-spoof yes
+set network profiles zone-protection-profile ZP-UNTRUST discard-ip-frag yes
+set network profiles zone-protection-profile ZP-UNTRUST discard-malformed-option yes
+set network profiles zone-protection-profile ZP-UNTRUST strict-ip-check yes
+set zone untrust network zone-protection-profile ZP-UNTRUST
+
+# Classified DoS protection for the DMZ web server
+set profiles dos-protection DOS-WEB type classified
+set profiles dos-protection DOS-WEB flood tcp-syn enable yes
+set profiles dos-protection DOS-WEB flood tcp-syn syn-cookies alarm-rate 2000 activate-rate 3000 maximal-rate 5000 block duration 300
+set profiles dos-protection DOS-WEB resource sessions enabled yes max-concurrent-limit 2000
+
+set rulebase dos rules PROTECT-WEB from zone untrust to zone dmz source any destination SRV-WEB-DMZ service service-https
+set rulebase dos rules PROTECT-WEB action protect protection classified profile DOS-WEB classification-criteria address source-ip-only

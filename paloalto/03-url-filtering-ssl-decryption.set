@@ -1,0 +1,27 @@
+# Lab PA-03: URL filtering and SSL forward-proxy decryption
+# Goal: block malicious and unwanted categories; decrypt outbound HTTPS so threats inside TLS
+#       are inspected, but exempt finance, health and pinned-certificate sites.
+# Prerequisite: generate a forward-trust CA (FWD-TRUST-CA) and push it to clients through AD GPO.
+# Verify: Monitor > URL Filtering ; Monitor > Decryption ; show counter global filter delta yes | match ssl
+
+# URL filtering
+set profiles url-filtering URL-CORP block [ malware phishing command-and-control grayware hacking adult gambling ]
+set profiles url-filtering URL-CORP alert [ social-networking streaming-media file-sharing ]
+set profiles url-filtering URL-CORP credential-enforcement mode ip-user block [ phishing unknown ]
+
+# Decryption profile: block weak/expired/untrusted certificates
+set profiles decryption DECRYPT-STRICT ssl-forward-proxy block-expired-certificate yes
+set profiles decryption DECRYPT-STRICT ssl-forward-proxy block-untrusted-issuer yes
+set profiles decryption DECRYPT-STRICT ssl-forward-proxy block-unknown-cert yes
+set profiles decryption DECRYPT-STRICT ssl-protocol-settings min-version tls1-2
+
+# Decryption policy: exemptions first, then decrypt everything else
+set rulebase decryption rules NO-DECRYPT-SENSITIVE from trust to untrust source any destination any
+set rulebase decryption rules NO-DECRYPT-SENSITIVE category [ financial-services health-and-medicine government ]
+set rulebase decryption rules NO-DECRYPT-SENSITIVE action no-decrypt type ssl-forward-proxy
+
+set rulebase decryption rules DECRYPT-OUTBOUND from trust to untrust source any destination any category any
+set rulebase decryption rules DECRYPT-OUTBOUND action decrypt type ssl-forward-proxy profile DECRYPT-STRICT
+
+# Attach URL filtering to the internet rule
+set rulebase security rules STAFF-BUSINESS-APPS profile-setting profiles url-filtering URL-CORP
